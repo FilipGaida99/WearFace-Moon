@@ -87,7 +87,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
         Calendar superMoonDate;
         SimpleDateFormat hourFormat;
         SimpleDateFormat dateFormat;
-        Date lastRedrawDate;
+        Calendar lastRedrawDate;
 
         Bitmap backgroundBitmap;
         Bitmap backgroundScaledBitmap;
@@ -138,9 +138,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
         final BroadcastReceiver dateChangeReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                calendar.setTime(new Date());
-                dateDescription = GetTextFromDate(calendar.getTime());
-                RedrawEclipse(calendar.getTime());
+                RefreshToNewDate();
             }
         };
 
@@ -204,8 +202,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
             dateFormat = new SimpleDateFormat("EE dd MMM");
 
             batteryLevel = "-%";
-            dateDescription = GetTextFromDate(calendar.getTime());
-            timeDescription = GetTextFromTime(calendar.getTime());
+            dateDescription = GetTextFromDate(calendar);
+            timeDescription = GetTextFromTime(calendar);
 
 
             //Last full moon
@@ -269,7 +267,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
             super.onTimeTick();
 
             calendar.setTime(new Date());
-            timeDescription = GetTextFromTime(calendar.getTime());
+            timeDescription = GetTextFromTime(calendar);
 
             invalidate();
         }
@@ -293,14 +291,13 @@ public class MyWatchFace extends CanvasWatchFaceService {
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
 
-            Date currentDate = calendar.getTime();
 
             canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
 
             if(!isInAmbientMode()) {
 
                 //Eclipse
-                canvas.drawBitmap(GetEclipse(currentDate), 0, 0, eclipsePaint);
+                canvas.drawBitmap(GetEclipse(calendar), 0, 0, eclipsePaint);
                 //Time
                 DrawCenteredText(timeDescription, lightTextPaint, darkTextPaint, canvas, bounds, 0, 0, BIG_TEXT_SIZE);
 
@@ -343,16 +340,17 @@ public class MyWatchFace extends CanvasWatchFaceService {
 
         }
 
-        private String GetTextFromTime(Date time){
-            return hourFormat.format(time);
+        private String GetTextFromTime(Calendar time){
+            return hourFormat.format(time.getTime());
         }
 
-        private String GetTextFromDate(Date time){
-            return dateFormat.format(time);
+        private String GetTextFromDate(Calendar time){
+            return dateFormat.format(time.getTime());
         }
 
-        private void RedrawEclipse(Date currentDate){
+        private void RedrawEclipse(Calendar currentDate){
             Canvas eclipseCanvas = new Canvas(eclipseBitmap);
+            eclipseCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
             Rect bounds = eclipseCanvas.getClipBounds();
 
             double moonPhase = GetMoonPhase(currentDate);
@@ -370,23 +368,28 @@ public class MyWatchFace extends CanvasWatchFaceService {
             }
 
             eclipseCanvas.drawOval(bounds.centerX() - width, bounds.top, bounds.centerX() + width, bounds.bottom, blackPaint);
-
-            lastRedrawDate = currentDate;
+            lastRedrawDate = Calendar.getInstance();
 
         }
 
         //Return moon phase in (-0.5,0.5) where 0 is new moon
-        private double GetMoonPhase(Date currentDate){
+        private double GetMoonPhase(Calendar currentDate){
            return ChronoUnit.DAYS.between(superMoonDate.getTime().toInstant(), currentDate.toInstant()) / MOON_LIFE % 1 - 0.5;
         }
 
-        private Bitmap GetEclipse(Date currentDate){
+        private Bitmap GetEclipse(Calendar currentDate){
 
-            if(lastRedrawDate == null || lastRedrawDate.getDay() != currentDate.getDay()){
-                RedrawEclipse(currentDate);
+            if(lastRedrawDate == null || lastRedrawDate.get(Calendar.DAY_OF_MONTH) != currentDate.get(Calendar.DAY_OF_MONTH) || lastRedrawDate.get(Calendar.MONTH) != currentDate.get(Calendar.MONTH) ){
+                RefreshToNewDate();
             }
             return eclipseBitmap;
 
+        }
+
+        private void RefreshToNewDate(){
+            calendar = Calendar.getInstance();
+            dateDescription = GetTextFromDate(calendar);
+            RedrawEclipse(calendar);
         }
 
     }
